@@ -1,0 +1,145 @@
+#!/usr/bin/python
+import random
+import sys
+import getopt
+import requests
+import json
+import os
+import pika
+from ConfigParser import SafeConfigParser
+
+# Read from config file
+parser = SafeConfigParser()
+try:
+   parser.read('/usr/local/etc/influxdb-htcondor.conf')
+   hostsInflux = parser.get('db', 'host')
+   database = parser.get('db', 'database')
+   username = parser.get('auth', 'username')
+   password = parser.get('auth', 'password')
+except:
+   raise NameError('Unable to read from config file')
+
+try:
+   opts, args = getopt.getopt(sys.argv[1:],"c:n:v:ty:u:sl:sp:tm:dm",["conf=","name=","value=","type=","units=","slope=","spoof=","tmax=","dmax="])
+except getopt.GetoptError:
+   print 'ERROR'
+   print sys.argv[1:]
+   sys.exit(2)
+
+for opt, arg in opts:
+   if opt == '-h':
+      print 'test.py -i <inputfile> -o <outputfile>'
+      sys.exit()
+   elif opt in ("-n", "--name"):
+      name = arg
+   elif opt in ("-v", "--value"):
+      value = arg
+   elif opt in ("-t", "--type"):
+      type = arg
+   elif opt in ("-sp", "--spoof"):
+      spoof = arg
+
+if type == 'string':
+   exit(0)
+
+if ' ' in name:
+   name = name.replace(" ", "\\ ")
+
+# Build Metric String / JSON
+
+nameTag = name.split('~')
+if "(+st)" in nameTag[0]:
+	stNameTag = nameTag[0].split("(+st)")
+
+sendviaElastic = True
+
+if sendviaElastic:
+	if len(nameTag) == 2:
+		# String Values 
+		if "(+st)" in nameTag[0]:	  
+			log_data = dict()
+			log_data['Name'] = stNameTag[0]
+			log_data['GlideinSite'] = nameTag[1]
+			log_data['host'] = spoof.split(':')[1]
+			log_data['stValue'] = stNameTag[1]
+			log_data['flValue'] = value
+		# Int/Float Values
+		else:
+			log_data = dict()
+			log_data['Name'] = nameTag[0]
+			log_data['GlideinSite'] = nameTag[1]
+			log_data['host'] = spoof.split(':')[1]
+			log_data['flValue'] = value
+
+	elif len(nameTag) == 3:
+		log_data = dict()
+		log_data['Name'] = nameTag[0]
+		log_data['LigoTag'] = nameTag[1]
+		log_data['GlideinSite'] = nameTag[2]
+		log_data['host'] = spoof.split(':')[1]
+		log_data['flValue'] = value
+
+	else:
+		log_data = dict()
+		log_data['Name'] = name
+		log_data['host'] = spoof.split(':')[1]
+		log_data['flValue'] = value
+	
+	message = json.dumps(log_data)
+	
+	#SEND USING ES
+
+	config_file = os.path.dirname(os.path.realpath(__file__)) + "/rabbitmq_osg.json"
+	with open(config_file,'r') as f:
+		data = json.load(f) 
+
+	# Set up conection with RabbitMQ
+	host = str(data['host'])
+	vhost = str(data['vhost'])
+
+	credentials = pika.PlainCredentials(data['username'],data['password'])
+	connection = pika.BlockingConnection(pika.ConnectionParameters(host=host,credentials=credentials, virtual_host=vhost))
+	channel = connection.channel()
+	channel.queue_declare(queue=str(data['queue']))
+
+	# send to RabbitMQ
+	exchange = str(data['exchange'])
+	key = data['key']
+	
+	channel.exchange_declare(exchange=exchange, type='fanout',durable=True)
+	channel.basic_publish(exchange=exchange, routing_key=key, body=message)
+	connection.close()
+
+if 'int' in type:
+   value = value + "i"
+
+try:
+   if len(nameTag) == 2:
+		if "(+st)" in nameTag[0]:
+			data = stNameTag[0] + ',stValue=' + stNameTag[1] + ',GlideinSit=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
+		else:
+			data = nameTag[0] + ',GlideinSit=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
+   elif len(nameTag) == 3:
+  		data = nameTag[0] + ',tags=' + nameTag[1] + ',GlideinSit=' + nameTag[2] + ',host=' + spoof.split(':')[1] + ' value=' + value
+   else:
+		data = name + ',host=' + spoof.split(':')[1] + ' value=' + value
+except:
+   data = name + ',host=' + spoof.split(':')[1] + ' value=' + value 
+
+# repeat until we have success
+hosts = hostsInflux.split(',')
+success = False
+while not success:
+   pick = random.randint(0,len(hosts)-1)
+   statuscode = 0
+   try:
+      r = requests.post('http://'+hosts[pick]+'/write?db='+database, auth=(username, password), data=data, timeout=40)
+      statuscode = r.status_code
+   except:
+      print 'ERROR: Problem connecting to',hosts[pick]
+   if statuscode == 204:
+      success = True
+   else:
+      hosts.remove(hosts[pick])
+      if len(hosts) == 0:
+         raise NameError('Unable to send metrics to InfluxDB status code error: %d' % statuscode)

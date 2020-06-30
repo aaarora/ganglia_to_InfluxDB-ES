@@ -1,0 +1,9 @@
+{
+	"host" : "%",
+	"vhost" : "%",
+	"username" : "%",
+	"password" : "%",
+	"queue" : "%",
+	"exchange" : "%",
+	"key" : "%"
+}	
