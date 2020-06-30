@@ -59,7 +59,7 @@ if sendviaElastic:
 		if "(+st)" in nameTag[0]:	  
 			log_data = dict()
 			log_data['Name'] = stNameTag[0]
-			log_data['GlideinSite'] = nameTag[1]
+			log_data['tag1'] = nameTag[1]
 			log_data['host'] = spoof.split(':')[1]
 			log_data['stValue'] = stNameTag[1]
 			log_data['flValue'] = value
@@ -67,15 +67,15 @@ if sendviaElastic:
 		else:
 			log_data = dict()
 			log_data['Name'] = nameTag[0]
-			log_data['GlideinSite'] = nameTag[1]
+			log_data['tag1'] = nameTag[1]
 			log_data['host'] = spoof.split(':')[1]
 			log_data['flValue'] = value
 
 	elif len(nameTag) == 3:
 		log_data = dict()
 		log_data['Name'] = nameTag[0]
-		log_data['LigoTag'] = nameTag[1]
-		log_data['GlideinSite'] = nameTag[2]
+		log_data['tag1'] = nameTag[1]
+		log_data['tag2'] = nameTag[2]
 		log_data['host'] = spoof.split(':')[1]
 		log_data['flValue'] = value
 
@@ -116,11 +116,11 @@ if 'int' in type:
 try:
    if len(nameTag) == 2:
 		if "(+st)" in nameTag[0]:
-			data = stNameTag[0] + ',stValue=' + stNameTag[1] + ',GlideinSit=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
+			data = stNameTag[0] + ',stValue=' + stNameTag[1] + ',tag=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
 		else:
-			data = nameTag[0] + ',GlideinSit=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
+			data = nameTag[0] + ',tag=' + nameTag[1] + ',host=' + spoof.split(':')[1] + ' value=' + value
    elif len(nameTag) == 3:
-  		data = nameTag[0] + ',tags=' + nameTag[1] + ',GlideinSit=' + nameTag[2] + ',host=' + spoof.split(':')[1] + ' value=' + value
+  		data = nameTag[0] + ',tag1=' + nameTag[1] + ',tag2=' + nameTag[2] + ',host=' + spoof.split(':')[1] + ' value=' + value
    else:
 		data = name + ',host=' + spoof.split(':')[1] + ' value=' + value
 except:
