@@ -10,7 +10,7 @@ The Metric must be constructed in this exact way:
 1. For Metrics tagged with LigoTag and GlideinSite w/ float/int type values:\
 [\
 	Aggregate = "%";\
-	Name = "MetricName~LigoTag~GlideinSite";\
+	Name = "MetricName\~LigoTag\~GlideinSite";\
 	Value = ClassAd_Name;\
 	Units = "%";\
 	Desc = "%";\
